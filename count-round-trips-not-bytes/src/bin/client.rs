@@ -7,10 +7,11 @@ const MESSAGE: &[u8] = b"MESSAGE";
 
 enum Mode {
     Sequential,
+    Pipelined,
 }
 
 fn usage() -> ! {
-    eprintln!("usage: client <sequential>");
+    eprintln!("usage: client <sequential|pipelined|window N>");
     std::process::exit(1);
 }
 
@@ -18,6 +19,7 @@ fn get_mode() -> Mode {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("sequential") => Mode::Sequential,
+        Some("pipelined") => Mode::Pipelined,
         _ => usage(),
     }
 }
@@ -44,6 +46,21 @@ fn sequential(socket: &UdpSocket) -> std::io::Result<Duration> {
     Ok(start_time.elapsed())
 }
 
+fn pipelined(socket: &UdpSocket) -> std::io::Result<Duration> {
+    let start_time = Instant::now();
+    let mut buf = [0; BUFFER_SIZE];
+
+    for _ in 0..REQUESTS {
+        socket.send(MESSAGE)?;
+    }
+
+    for _ in 0..REQUESTS {
+        recv_and_check(socket, &mut buf)?;
+    }
+
+    Ok(start_time.elapsed())
+}
+
 fn main() -> std::io::Result<()> {
     let mode = get_mode();
 
@@ -53,6 +70,7 @@ fn main() -> std::io::Result<()> {
 
     let elapsed = match mode {
         Mode::Sequential => sequential(&socket)?,
+        Mode::Pipelined => pipelined(&socket)?,
     };
 
     println!("{:?}", elapsed);
