@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 const BUFFER_SIZE: usize = 64;
-const DELAY_MS: u64 = 50;
+const DELAY_MS: u64 = 87;
 
 fn main() -> std::io::Result<()> {
     let socket = Arc::new(UdpSocket::bind("127.0.0.1:8000")?);
