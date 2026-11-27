@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::net::UdpSocket;
 use std::time::{Duration, Instant};
 
@@ -8,6 +9,7 @@ const MESSAGE: &[u8] = b"MESSAGE";
 enum Mode {
     Sequential,
     Pipelined,
+    Window(usize),
 }
 
 fn usage() -> ! {
@@ -20,6 +22,10 @@ fn get_mode() -> Mode {
     match args.get(1).map(String::as_str) {
         Some("sequential") => Mode::Sequential,
         Some("pipelined") => Mode::Pipelined,
+        Some("window") => match args.get(2).and_then(|s| s.parse().ok()) {
+            Some(n) => Mode::Window(n),
+            None => usage(),
+        },
         _ => usage(),
     }
 }
@@ -61,6 +67,30 @@ fn pipelined(socket: &UdpSocket) -> std::io::Result<Duration> {
     Ok(start_time.elapsed())
 }
 
+fn window(socket: &UdpSocket, n: usize) -> std::io::Result<Duration> {
+    let start_time = Instant::now();
+    let mut buf = [0; BUFFER_SIZE];
+
+    let initial_window = min(n, REQUESTS);
+    for _ in 0..initial_window {
+        socket.send(MESSAGE)?;
+    }
+
+    let mut sent = initial_window;
+    let mut in_flight = initial_window;
+    while in_flight > 0 {
+        recv_and_check(socket, &mut buf)?;
+        if sent < REQUESTS {
+            socket.send(MESSAGE)?;
+            sent += 1;
+        } else {
+            in_flight -= 1;
+        }
+    }
+
+    Ok(start_time.elapsed())
+}
+
 fn main() -> std::io::Result<()> {
     let mode = get_mode();
 
@@ -71,6 +101,7 @@ fn main() -> std::io::Result<()> {
     let elapsed = match mode {
         Mode::Sequential => sequential(&socket)?,
         Mode::Pipelined => pipelined(&socket)?,
+        Mode::Window(n) => window(&socket, n)?,
     };
 
     println!("{:?}", elapsed);
