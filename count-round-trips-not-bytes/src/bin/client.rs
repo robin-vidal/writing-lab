@@ -3,6 +3,7 @@ use std::net::UdpSocket;
 use std::time::{Duration, Instant};
 
 const REQUESTS: usize = 10;
+const WINDOW_REQUESTS: usize = 200;
 const BUFFER_SIZE: usize = 64;
 const MESSAGE: &[u8] = b"MESSAGE";
 
@@ -71,7 +72,7 @@ fn window(socket: &UdpSocket, n: usize) -> std::io::Result<Duration> {
     let start_time = Instant::now();
     let mut buf = [0; BUFFER_SIZE];
 
-    let initial_window = min(n, REQUESTS);
+    let initial_window = min(n, WINDOW_REQUESTS);
     for _ in 0..initial_window {
         socket.send(MESSAGE)?;
     }
@@ -80,7 +81,7 @@ fn window(socket: &UdpSocket, n: usize) -> std::io::Result<Duration> {
     let mut in_flight = initial_window;
     while in_flight > 0 {
         recv_and_check(socket, &mut buf)?;
-        if sent < REQUESTS {
+        if sent < WINDOW_REQUESTS {
             socket.send(MESSAGE)?;
             sent += 1;
         } else {
